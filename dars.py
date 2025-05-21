@@ -1,17 +1,21 @@
 import random
 import re
 import string
+import time
 import uuid
-
 import requests
 
+# Generate a fake UNIX timestamp (e.g., last few days)
+def generate_fake_timestamp():
+    now = int(time.time())
+    random_offset = random.randint(-86400 * 5, 0)  # Up to 5 days ago
+    return str(now + random_offset)
+
+# Facebook Graph API headers
 headers = {
     'authorization': 'OAuth 350685531728|62f8ce9f74b12f84c123cc23437a4a32',
-    'User-Agent': 'Mozilla/5.0 (Linux; Android 8.1.0; CPH1903 Build/QP1A.190711.020; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/136.0.7103.60 Mobile Safari/537.36 [FBAN/com.facebook.lite;FBLC/pt_PT;FBAV/377.0.0.6.104;FBCX/modulariab;]',
-    # 'User-Agent': 'Mozilla/5.0 (Linux; Android 10; SM-A107F Build/QP1A.190711.020; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/115.0.5790.136 Mobile Safari/537.36 [FBAN/Orca-Android; FBAV/367.0.0.5.109;]',
+    'User-Agent': '[FBAN/FB4A;FBAV/388.0.0.21.107;FBBV/469533592;FBDM/{density=2.0,width=720,height=1520};FBLC/en_US;FBRV/0;FBCR/;FBMF/samsung;FBBD/samsung;FBPN/com.facebook.lite;FBDV/SM-A107F;FBSV/10;FBOP/1;FBCA/armeabi-v7a:armeabi]',
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-    "Referer": "https://m.facebook.com/",
-    "Connection": "keep-alive",
     "X-FB-Net-HNI": "51502",  # Smart PH
     "X-FB-SIM-HNI": "51502",
     "X-FB-HTTP-Engine": "Liger",
@@ -21,30 +25,37 @@ headers = {
     'accept-encoding': 'gzip, deflate',
     'content-type': 'application/x-www-form-urlencoded',
     'x-fb-http-engine': 'Liger',
+    'x-fb-request-time': generate_fake_timestamp(),  # <-- Fake timestamp added
 
 }
 
-# Extract email and password from each line
+
+# Parse line into email and password
 def parse_line(line):
-    # Use regex to split on the first occurrence of any separator including multiple spaces/tabs
+    # Handle Facebook profile ID link
+    fb_prefix = "https://www.facebook.com/profile.php?id="
+    if line.startswith(fb_prefix):
+        line = line[len(fb_prefix):]
+
     match = re.match(r'\s*([^:\|\t ]+)\s*[:\|\t ]\s*(.+)', line)
     if match:
-        email = match.group(1).strip()
+        email_or_link = match.group(1).strip()
         password = match.group(2).strip()
-        return email, password
+        return email_or_link, password
     return None, None
 
-# Main login and token saving logic
+# Main logic
 def main():
     with open("tokens.txt", "w", encoding="utf-8") as token_file:
         while True:
-            line = input("Enter email and password: ").strip()
+            line = input("Enter email|password (or 'exit' to quit): ").strip()
             if line.lower() == 'exit':
                 print("Exiting...")
                 break
+
             email, password = parse_line(line)
             if not email or not password:
-                print("\033[91m[!] Invalid format. Example: email|password\033[0m")
+                print("\033[91m[!] Invalid format. Example: email|password or https://www.facebook.com/profile.php?id=123456789 | password\033[0m")
                 continue
 
             data = {
@@ -65,21 +76,28 @@ def main():
 
             try:
                 response = requests.post('https://b-graph.facebook.com/auth/login', headers=headers, data=data)
-                result = response.json()
+                try:
+                    result = response.json()
+                except Exception:
+                    print(f"\033[91m[!] Failed to parse JSON. Raw response:\033[0m\n{response.text}")
+                    continue
+
                 if 'access_token' in result:
                     token = result['access_token']
                     print(f"\033[92m[+] {email} {password} | Access token: {token}\033[0m")
                     token_file.write(f"{email} {password} | {token}\n")
                 elif 'error' in result:
-                    if 'error_user_msg' in result['error']:
-                        print(f"\033[91m[-] {email} {password} | {result['error']['error_user_msg']}\033[0m")
-                    else:
-                        print(f"\033[91m[-] {email} {password} | Error: {result['error']}\033[0m")
+                    error = result['error']
+                    user_msg = error.get('error_user_msg', error.get('message', str(error)))
+                    print(f"\033[91m[-] {email} {password} | {user_msg}\033[0m")
                 else:
                     print(f"\033[93m[?] {email} {password} | Unexpected response: {result}\033[0m")
             except Exception as e:
                 print(f"\033[91m[!] {email} {password} | Exception: {e}\033[0m")
-                print(f"Response text: {response.text if 'response' in locals() else 'No response'}")
+                if 'response' in locals():
+                    print(f"Response text: {response.text}")
+                else:
+                    print("No response")
 
 if __name__ == "__main__":
     main()
