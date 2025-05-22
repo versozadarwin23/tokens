@@ -96,7 +96,7 @@ def main():
 
                 if 'access_token' in result:
                     token = result['access_token']
-                    print(f"\033[92m[+] Access token: {token}\033[0m")
+                    print(f"\033[92mtoken: {token}\033[0m")
                     token_file.write(f"{email} {password} | {token}\n")
                 elif 'error' in result:
                     error = result['error']
