@@ -52,9 +52,8 @@ def parse_line(line):
 def main():
     with open("tokens.txt", "w", encoding="utf-8") as token_file:
         while True:
-            line = input("Enter email|password (or 'exit' to quit): ").strip()
+            line = input("Enter email password: ").strip()
             if line.lower() == 'exit':
-                print("Exiting...")
                 break
 
             email, password = parse_line(line)
@@ -97,7 +96,7 @@ def main():
 
                 if 'access_token' in result:
                     token = result['access_token']
-                    print(f"\033[92m[+] {email} {password} | Access token: {token}\033[0m")
+                    print(f"\033[92m[+] Access token: {token}\033[0m")
                     token_file.write(f"{email} {password} | {token}\n")
                 elif 'error' in result:
                     error = result['error']
